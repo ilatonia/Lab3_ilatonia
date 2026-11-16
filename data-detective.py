@@ -3,30 +3,28 @@ import sys
 import os
 
 def load_raw_data(filename):
+    """
+    Loads the CSV file into a list of dictionaries exactly as it is (messy).
+    """
     if not os.path.exists(filename):
         print(f"Error: The file '{filename}' was not found.")
         sys.exit(1)
+
     raw_tweets = []
-    try:
-        with open(filename, mode='r', encoding='utf-8') as file:
-            reader = csv.DictReader(file)
-            if reader.fieldnames is None:
-                print("Error: CSV file is empty.")
-                return []
-            for row in reader:
-                # Skip completely empty rows
-                if row is None or len(row) == 0:
-                    continue
-                if all((v is None or str(v).strip() == "") for v in row.values()):
-                    continue
-                raw_tweets.append(row)
-    except Exception as e:
-        print(f"Error reading file: {e}")
-        sys.exit(1)
+    with open(filename, mode='r', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            # Skip completely empty rows
+            if row is None or len(row) == 0:
+                continue
+            if all((v is None or str(v).strip() == "") for v in row.values()):
+                continue
+            raw_tweets.append(row)
+
     return raw_tweets
 
 def get_value(tweet, *names):
-    # CSV headers can be 'Text' or 'Tweet Text' etc. - find any match
+    # Find a column even if header is 'Text' or 'Tweet Text'
     for key in tweet.keys():
         if key is None:
             continue
@@ -37,7 +35,6 @@ def get_value(tweet, *names):
     return None
 
 def to_int(value):
-    # Safely convert Likes/Retweets to int, bad -> 0
     try:
         if value is None or str(value).strip() == "":
             return 0
@@ -46,7 +43,11 @@ def to_int(value):
         return 0
 
 def clean_data(tweets):
-    """QUEST 1: Remove tweets with no Text, fix empty Likes/Retweets to 0."""
+    """
+    QUEST 1: Handle missing fields.
+    Check for missing text, and replace empty likes/retweets with 0.
+    Return a clean list of tweets.
+    """
     clean = []
     bad = 0
     for tweet in tweets:
@@ -54,22 +55,21 @@ def clean_data(tweets):
         if text is None or str(text).strip() == "":
             bad = bad + 1
             continue
-        # Fix Likes / Retweets
-        likes = get_value(tweet, "Likes", "Like", "Likes Count")
-        retweets = get_value(tweet, "Retweets", "Retweet", "Retweet Count")
-        # Write back using the real keys found in the file
+        # Fix empty Likes / Retweets to 0
         for key in list(tweet.keys()):
             if key and key.strip().lower() in ("likes", "like"):
-                tweet[key] = str(to_int(likes))
+                tweet[key] = str(to_int(get_value(tweet, "Likes")))
             if key and key.strip().lower() in ("retweets", "retweet"):
-                tweet[key] = str(to_int(retweets))
+                tweet[key] = str(to_int(get_value(tweet, "Retweets")))
         clean.append(tweet)
-    print(f"Quest 1: Cleaned data. {bad} bad row(s) fixed/removed.")
+    print(f"Quest 1: {bad} bad row(s) fixed/removed.")
     print(f"Clean tweets: {len(clean)}\n")
     return clean
 
 def find_viral_tweet(tweets):
-    """QUEST 2: Loop to find highest Likes. No max() allowed."""
+    """
+    QUEST 2: Loop through the list to find the tweet with the highest 'Likes'.
+    """
     if len(tweets) == 0:
         print("Quest 2: No tweets to check.")
         return None
@@ -87,8 +87,11 @@ def find_viral_tweet(tweets):
     return viral
 
 def custom_sort_by_likes(tweets):
-    """QUEST 3: Bubble Sort descending by Likes."""
-    sorted_list = tweets[:]  # copy, don't change original
+    """
+    QUEST 3: Implement Bubble Sort to sort the list
+    by 'Likes' in descending order.
+    """
+    sorted_list = tweets[:]
     n = len(sorted_list)
     for i in range(n):
         for j in range(0, n - i - 1):
@@ -101,7 +104,9 @@ def custom_sort_by_likes(tweets):
     return sorted_list
 
 def search_tweets(tweets, keyword):
-    """QUEST 4: Build a NEW list with matching tweets."""
+    """
+    QUEST 4: Search for a keyword and extract matching tweets into a new list.
+    """
     results = []
     keyword = keyword.lower()
     for tweet in tweets:
@@ -111,17 +116,17 @@ def search_tweets(tweets, keyword):
     return results
 
 if __name__ == "__main__":
+    # Load the messy data
     dataset = load_raw_data("twitter_dataset.csv")
     print(f"Loaded {len(dataset)} raw tweets.\n")
 
-    if len(dataset) == 0:
-        print("CSV is empty. Nothing to do.")
-        sys.exit(0)
-
+    # Quest 1
     clean_dataset = clean_data(dataset)
 
+    # Quest 2
     find_viral_tweet(clean_dataset)
 
+    # Quest 3
     sorted_tweets = custom_sort_by_likes(clean_dataset)
     print("=== Quest 3: Top 10 Most Liked Tweets ===")
     top10 = sorted_tweets[:10]
@@ -131,6 +136,7 @@ if __name__ == "__main__":
         print(f"   {get_value(t, 'Text', 'Tweet Text')}")
     print()
 
+    # Quest 4
     keyword = input("Quest 4: Enter a search word (e.g. Python): ").strip()
     if keyword == "":
         print("No keyword entered.")
